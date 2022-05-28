@@ -4,6 +4,16 @@ import time
 
 from bs4 import BeautifulSoup
 from itertools import groupby
+from datetime import datetime
+
+def get_curr_date():
+    import platform
+
+    # 去除月份前導 0 , 不同作業系統的做法不一樣
+    if platform.system() == "Windows":
+        return datetime.now().strftime("%Y-%#m-%d")
+    else:
+        return datetime.now().strftime("%Y-%-m-%d")
 
 def format_amount(value):
     return int(value.replace(",", ""))
@@ -86,28 +96,41 @@ def analysis_data(result, filters={}):
     
     return compare_res
 
-target_broker = [
-    ("9200", "9216"), # 凱基信義
-    ("9A00", "0039004100390052"), # 永豐金信義
-    ("8560", "8564"), # 新光台南
-    ("7790", "003700370039005a"), # 國票安和
-]
+def run(args={}):
+    target_broker = args.get("target_broker", [])
+    start_date = args.get("start_date", get_curr_date())
+    end_date = args.get("end_date", get_curr_date())
 
-result = {}
+    result = {}
 
-s = "2022-5-10"
-e = "2022-5-13"
+    for broker_id, seller_id in target_broker:
+        res = get_data(start_date, end_date, broker_id, seller_id)
 
-for broker_id, seller_id in target_broker:
-    res = get_data(s, e, broker_id, seller_id)
+        result[seller_id] = res
 
-    result[seller_id] = res
+        time.sleep(1)
+    
+    final_data = analysis_data(result)
+    final_data = sorted(final_data, key=lambda r: len(r[1]), reverse=True)
 
-    time.sleep(1)
+    if args.get("print"):
+        print(final_data)
 
-d = analysis_data(result)
-d = sorted(d, key=lambda r: len(r[1]), reverse=True)
+    return final_data
 
-for key, info in d:
-    broker_ids = [r[0] for r in info]
-    print(key, broker_ids, len(info))
+if __name__ == "__main__":
+    import json
+
+    data = run({
+        "target_broker": [
+            ("9200", "9216"), # 凱基信義
+            ("9A00", "0039004100390052"), # 永豐金信義
+            ("8560", "8564"), # 新光台南
+            ("7790", "003700370039005a"), # 國票安和
+        ],
+        "start_date": "2022-5-10",
+        "end_date": "2022-5-13",
+        "print": True
+    })
+
+    print(json.dumps(data))
